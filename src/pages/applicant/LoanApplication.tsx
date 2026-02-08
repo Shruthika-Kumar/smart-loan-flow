@@ -1,11 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
-  Home,
-  Car,
-  GraduationCap,
-  Wallet,
-  Building2,
   User,
   Briefcase,
   Upload,
@@ -15,8 +11,7 @@ import {
   ArrowLeft,
   FileText,
   CreditCard,
-  Percent,
-  Clock,
+  AlertCircle,
 } from "lucide-react";
 import { ApplicantLayout } from "@/components/layout/ApplicantLayout";
 import { Button } from "@/components/ui/button";
@@ -33,63 +28,25 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { GaugeChart } from "@/components/ui/gauge-chart";
 import { Separator } from "@/components/ui/separator";
-
-const loanTypes = [
-  {
-    id: "home",
-    name: "Home Loan",
-    icon: Home,
-    rate: "8.5% - 10.5%",
-    maxTenure: "30 years",
-    description: "Purchase or construct your dream home",
-  },
-  {
-    id: "vehicle",
-    name: "Vehicle Loan",
-    icon: Car,
-    rate: "9.0% - 12.5%",
-    maxTenure: "7 years",
-    description: "Finance your new or used vehicle",
-  },
-  {
-    id: "education",
-    name: "Education Loan",
-    icon: GraduationCap,
-    rate: "7.5% - 11.0%",
-    maxTenure: "15 years",
-    description: "Invest in your future with education financing",
-  },
-  {
-    id: "personal",
-    name: "Personal Loan",
-    icon: Wallet,
-    rate: "10.5% - 18.0%",
-    maxTenure: "5 years",
-    description: "Quick funds for personal needs",
-  },
-  {
-    id: "business",
-    name: "Business Loan",
-    icon: Building2,
-    rate: "11.0% - 16.0%",
-    maxTenure: "10 years",
-    description: "Grow your business with capital",
-  },
-];
+import { useToast } from "@/hooks/use-toast";
+import { LoanTypeSelector, loanTypes } from "@/components/loan/LoanTypeSelector";
+import { SmartDocumentUpload, useSmartDocumentUpload, ExtractedData } from "@/components/loan/SmartDocumentUpload";
+import { AIEligibilityPreview } from "@/components/loan/AIEligibilityPreview";
 
 const steps = [
   { id: 1, name: "Loan Type", icon: CreditCard },
-  { id: 2, name: "Personal Details", icon: User },
-  { id: 3, name: "Employment", icon: Briefcase },
-  { id: 4, name: "Loan Details", icon: FileText },
-  { id: 5, name: "Documents", icon: Upload },
+  { id: 2, name: "Upload Documents", icon: Upload },
+  { id: 3, name: "Personal Details", icon: User },
+  { id: 4, name: "Employment", icon: Briefcase },
+  { id: 5, name: "Loan Details", icon: FileText },
   { id: 6, name: "AI Preview", icon: Sparkles },
   { id: 7, name: "Review", icon: CheckCircle2 },
 ];
 
 export default function LoanApplication() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedLoanType, setSelectedLoanType] = useState<string | null>(null);
   const [employmentType, setEmploymentType] = useState<string>("salaried");
@@ -98,9 +55,11 @@ export default function LoanApplication() {
     fullName: "",
     pan: "",
     aadhaar: "",
+    dateOfBirth: "",
     maritalStatus: "",
     dependents: "",
     residentialType: "",
+    address: "",
     // Employment - Salaried
     companyName: "",
     designation: "",
@@ -110,24 +69,47 @@ export default function LoanApplication() {
     businessName: "",
     annualTurnover: "",
     yearsInBusiness: "",
-    // Loan Details - Home
+    // Loan Details
+    loanAmount: "",
+    loanTenure: "",
+    loanPurpose: "",
     propertyValue: "",
     downPayment: "",
     propertyLocation: "",
-    loanTenure: "",
     interestType: "",
-    // Loan Details - Vehicle
     vehicleCost: "",
     dealerName: "",
-    // Loan Details - Education
-    universityName: "",
-    courseDuration: "",
-    tuitionFees: "",
-    coApplicant: "",
-    // Loan Details - Business
-    loanPurpose: "",
-    collateralValue: "",
+    // Consent
+    agreeTerms: false,
+    agreeCredit: false,
   });
+
+  const handleDataExtracted = useCallback((data: ExtractedData) => {
+    setFormData((prev) => ({
+      ...prev,
+      fullName: data.fullName || prev.fullName,
+      pan: data.pan || prev.pan,
+      aadhaar: data.aadhaar || prev.aadhaar,
+      dateOfBirth: data.dateOfBirth || prev.dateOfBirth,
+      address: data.address || prev.address,
+      companyName: data.companyName || prev.companyName,
+      designation: data.designation || prev.designation,
+      monthlyIncome: data.monthlyIncome || prev.monthlyIncome,
+    }));
+
+    toast({
+      title: "Data Auto-filled",
+      description: "We've automatically filled your information from the uploaded document.",
+    });
+  }, [toast]);
+
+  const {
+    documents,
+    handleDocumentUpload,
+    handleRemoveDocument,
+    requiredDocumentsVerified,
+    uploadProgress,
+  } = useSmartDocumentUpload(handleDataExtracted);
 
   const progress = (currentStep / steps.length) * 100;
 
@@ -143,34 +125,65 @@ export default function LoanApplication() {
     }
   };
 
-  const updateFormData = (field: string, value: string) => {
+  const handleSubmit = () => {
+    toast({
+      title: "Application Submitted!",
+      description: "Your loan application has been submitted successfully. You will receive updates via SMS and email.",
+    });
+    navigate("/applicant/track");
+  };
+
+  const updateFormData = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        return selectedLoanType !== null;
+      case 2:
+        return requiredDocumentsVerified;
+      case 3:
+        return formData.fullName && formData.pan && formData.aadhaar;
+      case 4:
+        return employmentType === "salaried"
+          ? formData.companyName && formData.monthlyIncome
+          : formData.businessName && formData.annualTurnover;
+      case 5:
+        return formData.loanAmount && formData.loanTenure;
+      case 7:
+        return formData.agreeTerms && formData.agreeCredit;
+      default:
+        return true;
+    }
+  };
+
+  const selectedLoan = loanTypes.find((l) => l.id === selectedLoanType);
 
   return (
     <ApplicantLayout>
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Apply for a Loan
-          </h1>
+          <h1 className="text-2xl font-bold text-foreground">Apply for a Loan</h1>
           <p className="text-muted-foreground">
-            Complete the application in a few simple steps
+            Upload your documents first — we'll auto-fill your application using AI
           </p>
         </div>
 
         {/* Progress Bar */}
         <div className="space-y-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">Step {currentStep} of {steps.length}</span>
+            <span className="font-medium">
+              Step {currentStep} of {steps.length}: {steps[currentStep - 1].name}
+            </span>
             <span className="text-muted-foreground">{Math.round(progress)}% Complete</span>
           </div>
           <Progress value={progress} className="h-2" />
-          
+
           {/* Step Indicators */}
           <div className="hidden md:flex items-center justify-between">
-            {steps.map((step, index) => (
+            {steps.map((step) => (
               <div
                 key={step.id}
                 className={`flex flex-col items-center gap-2 ${
@@ -196,7 +209,7 @@ export default function LoanApplication() {
                     <step.icon className="h-5 w-5" />
                   )}
                 </div>
-                <span className="text-xs font-medium">{step.name}</span>
+                <span className="text-xs font-medium text-center max-w-[80px]">{step.name}</span>
               </div>
             ))}
           </div>
@@ -213,70 +226,61 @@ export default function LoanApplication() {
           >
             {/* Step 1: Loan Type Selection */}
             {currentStep === 1 && (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Select Loan Type</CardTitle>
-                    <CardDescription>
-                      Choose the type of loan that best fits your needs
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {loanTypes.map((loan) => (
-                        <motion.div
-                          key={loan.id}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setSelectedLoanType(loan.id)}
-                          className={`cursor-pointer p-6 rounded-xl border-2 transition-all ${
-                            selectedLoanType === loan.id
-                              ? "border-accent bg-accent/5"
-                              : "border-border hover:border-accent/50"
-                          }`}
-                        >
-                          <div className="space-y-4">
-                            <div
-                              className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                selectedLoanType === loan.id
-                                  ? "bg-accent text-accent-foreground"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              <loan.icon className="h-6 w-6" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold">{loan.name}</h3>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {loan.description}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm">
-                              <div className="flex items-center gap-1">
-                                <Percent className="h-3 w-3 text-accent" />
-                                <span>{loan.rate}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock className="h-3 w-3 text-accent" />
-                                <span>{loan.maxTenure}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <Card>
+                <CardContent className="pt-6">
+                  <LoanTypeSelector
+                    selectedLoanType={selectedLoanType}
+                    onSelect={setSelectedLoanType}
+                  />
+                </CardContent>
+              </Card>
             )}
 
-            {/* Step 2: Personal Details */}
+            {/* Step 2: Document Upload with OCR */}
             {currentStep === 2 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Personal Details</CardTitle>
+                  <CardTitle>Upload Your Documents</CardTitle>
                   <CardDescription>
-                    Provide your personal information for verification
+                    Our AI will automatically extract information and fill your application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SmartDocumentUpload
+                    documents={documents}
+                    onDocumentUpload={handleDocumentUpload}
+                    onDataExtracted={handleDataExtracted}
+                    onRemoveDocument={handleRemoveDocument}
+                  />
+
+                  {uploadProgress > 0 && (
+                    <div className="mt-6 p-4 bg-accent/5 border border-accent/20 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Documents Verified</span>
+                        <span className="text-sm text-accent">{Math.round(uploadProgress)}%</span>
+                      </div>
+                      <Progress value={uploadProgress} className="h-2" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step 3: Personal Details (Auto-filled) */}
+            {currentStep === 3 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Personal Details
+                    {formData.fullName && (
+                      <span className="text-xs font-normal text-accent bg-accent/10 px-2 py-1 rounded-full flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Auto-filled
+                      </span>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    Review and confirm your personal information
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -288,6 +292,7 @@ export default function LoanApplication() {
                         placeholder="Enter your full name"
                         value={formData.fullName}
                         onChange={(e) => updateFormData("fullName", e.target.value)}
+                        className={formData.fullName ? "border-accent/50 bg-accent/5" : ""}
                       />
                     </div>
                     <div className="space-y-2">
@@ -298,15 +303,27 @@ export default function LoanApplication() {
                         value={formData.pan}
                         onChange={(e) => updateFormData("pan", e.target.value.toUpperCase())}
                         maxLength={10}
+                        className={formData.pan ? "border-accent/50 bg-accent/5" : ""}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="aadhaar">Aadhaar Number</Label>
                       <Input
                         id="aadhaar"
-                        placeholder="1234 5678 9012"
+                        placeholder="XXXX XXXX 1234"
                         value={formData.aadhaar}
                         onChange={(e) => updateFormData("aadhaar", e.target.value)}
+                        className={formData.aadhaar ? "border-accent/50 bg-accent/5" : ""}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                      <Input
+                        id="dateOfBirth"
+                        placeholder="DD/MM/YYYY"
+                        value={formData.dateOfBirth}
+                        onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
+                        className={formData.dateOfBirth ? "border-accent/50 bg-accent/5" : ""}
                       />
                     </div>
                     <div className="space-y-2">
@@ -344,6 +361,16 @@ export default function LoanApplication() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="address">Residential Address</Label>
+                      <Input
+                        id="address"
+                        placeholder="Enter your full address"
+                        value={formData.address}
+                        onChange={(e) => updateFormData("address", e.target.value)}
+                        className={formData.address ? "border-accent/50 bg-accent/5" : ""}
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="residentialType">Residential Type</Label>
                       <Select
@@ -366,17 +393,24 @@ export default function LoanApplication() {
               </Card>
             )}
 
-            {/* Step 3: Employment Details */}
-            {currentStep === 3 && (
+            {/* Step 4: Employment Details */}
+            {currentStep === 4 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Employment Details</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    Employment Details
+                    {formData.companyName && (
+                      <span className="text-xs font-normal text-accent bg-accent/10 px-2 py-1 rounded-full flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Auto-filled
+                      </span>
+                    )}
+                  </CardTitle>
                   <CardDescription>
                     Tell us about your employment and income
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Employment Type Toggle */}
                   <RadioGroup
                     value={employmentType}
                     onValueChange={setEmploymentType}
@@ -384,11 +418,15 @@ export default function LoanApplication() {
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="salaried" id="salaried" />
-                      <Label htmlFor="salaried" className="cursor-pointer">Salaried</Label>
+                      <Label htmlFor="salaried" className="cursor-pointer">
+                        Salaried
+                      </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="self-employed" id="self-employed" />
-                      <Label htmlFor="self-employed" className="cursor-pointer">Self-Employed</Label>
+                      <Label htmlFor="self-employed" className="cursor-pointer">
+                        Self-Employed
+                      </Label>
                     </div>
                   </RadioGroup>
 
@@ -403,6 +441,7 @@ export default function LoanApplication() {
                           placeholder="Enter company name"
                           value={formData.companyName}
                           onChange={(e) => updateFormData("companyName", e.target.value)}
+                          className={formData.companyName ? "border-accent/50 bg-accent/5" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -412,6 +451,7 @@ export default function LoanApplication() {
                           placeholder="Enter your designation"
                           value={formData.designation}
                           onChange={(e) => updateFormData("designation", e.target.value)}
+                          className={formData.designation ? "border-accent/50 bg-accent/5" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -422,10 +462,11 @@ export default function LoanApplication() {
                           placeholder="Enter monthly income"
                           value={formData.monthlyIncome}
                           onChange={(e) => updateFormData("monthlyIncome", e.target.value)}
+                          className={formData.monthlyIncome ? "border-accent/50 bg-accent/5" : ""}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="workExperience">Work Experience (Years)</Label>
+                        <Label htmlFor="workExperience">Work Experience</Label>
                         <Select
                           value={formData.workExperience}
                           onValueChange={(value) => updateFormData("workExperience", value)}
@@ -488,226 +529,169 @@ export default function LoanApplication() {
               </Card>
             )}
 
-            {/* Step 4: Loan-Specific Details */}
-            {currentStep === 4 && (
+            {/* Step 5: Loan Details */}
+            {currentStep === 5 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Loan Details</CardTitle>
                   <CardDescription>
-                    Provide specific details about your loan requirements
+                    Specify your loan requirements for {selectedLoan?.name}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Home Loan Fields */}
-                  {selectedLoanType === "home" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="propertyValue">Property Value (₹)</Label>
-                        <Input
-                          id="propertyValue"
-                          type="number"
-                          placeholder="Enter property value"
-                          value={formData.propertyValue}
-                          onChange={(e) => updateFormData("propertyValue", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="downPayment">Down Payment (₹)</Label>
-                        <Input
-                          id="downPayment"
-                          type="number"
-                          placeholder="Enter down payment"
-                          value={formData.downPayment}
-                          onChange={(e) => updateFormData("downPayment", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="propertyLocation">Property Location</Label>
-                        <Input
-                          id="propertyLocation"
-                          placeholder="City, State"
-                          value={formData.propertyLocation}
-                          onChange={(e) => updateFormData("propertyLocation", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="loanTenure">Loan Tenure</Label>
-                        <Select
-                          value={formData.loanTenure}
-                          onValueChange={(value) => updateFormData("loanTenure", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select tenure" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="10">10 years</SelectItem>
-                            <SelectItem value="15">15 years</SelectItem>
-                            <SelectItem value="20">20 years</SelectItem>
-                            <SelectItem value="25">25 years</SelectItem>
-                            <SelectItem value="30">30 years</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>Interest Type</Label>
-                        <RadioGroup
-                          value={formData.interestType}
-                          onValueChange={(value) => updateFormData("interestType", value)}
-                          className="flex gap-6"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="fixed" id="fixed" />
-                            <Label htmlFor="fixed" className="cursor-pointer">Fixed Rate</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="floating" id="floating" />
-                            <Label htmlFor="floating" className="cursor-pointer">Floating Rate</Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="loanAmount">Loan Amount Required (₹)</Label>
+                      <Input
+                        id="loanAmount"
+                        type="number"
+                        placeholder="Enter loan amount"
+                        value={formData.loanAmount}
+                        onChange={(e) => updateFormData("loanAmount", e.target.value)}
+                      />
+                      {selectedLoan && (
+                        <p className="text-xs text-muted-foreground">
+                          Maximum: {selectedLoan.maxAmount}
+                        </p>
+                      )}
                     </div>
-                  )}
-
-                  {/* Vehicle Loan Fields */}
-                  {selectedLoanType === "vehicle" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="vehicleCost">Vehicle Cost (₹)</Label>
-                        <Input
-                          id="vehicleCost"
-                          type="number"
-                          placeholder="Enter vehicle cost"
-                          value={formData.vehicleCost}
-                          onChange={(e) => updateFormData("vehicleCost", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="dealerName">Dealer Name</Label>
-                        <Input
-                          id="dealerName"
-                          placeholder="Enter dealer name"
-                          value={formData.dealerName}
-                          onChange={(e) => updateFormData("dealerName", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="downPaymentVehicle">Down Payment (₹)</Label>
-                        <Input
-                          id="downPaymentVehicle"
-                          type="number"
-                          placeholder="Enter down payment"
-                          value={formData.downPayment}
-                          onChange={(e) => updateFormData("downPayment", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="loanTenureVehicle">Loan Tenure</Label>
-                        <Select
-                          value={formData.loanTenure}
-                          onValueChange={(value) => updateFormData("loanTenure", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select tenure" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">1 year</SelectItem>
-                            <SelectItem value="2">2 years</SelectItem>
-                            <SelectItem value="3">3 years</SelectItem>
-                            <SelectItem value="5">5 years</SelectItem>
-                            <SelectItem value="7">7 years</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Default/Personal Loan Fields */}
-                  {(!selectedLoanType || selectedLoanType === "personal" || selectedLoanType === "education" || selectedLoanType === "business") && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="loanAmount">Loan Amount Required (₹)</Label>
-                        <Input
-                          id="loanAmount"
-                          type="number"
-                          placeholder="Enter loan amount"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="loanPurpose">Purpose of Loan</Label>
-                        <Input
-                          id="loanPurpose"
-                          placeholder="Describe the purpose"
-                          value={formData.loanPurpose}
-                          onChange={(e) => updateFormData("loanPurpose", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="loanTenureGeneral">Loan Tenure</Label>
-                        <Select
-                          value={formData.loanTenure}
-                          onValueChange={(value) => updateFormData("loanTenure", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select tenure" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">1 year</SelectItem>
-                            <SelectItem value="2">2 years</SelectItem>
-                            <SelectItem value="3">3 years</SelectItem>
-                            <SelectItem value="5">5 years</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Step 5: Document Upload */}
-            {currentStep === 5 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upload Documents</CardTitle>
-                  <CardDescription>
-                    Upload the required documents for verification
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { name: "PAN Card", required: true },
-                      { name: "Aadhaar Card", required: true },
-                      { name: "Salary Slips (3 months)", required: true },
-                      { name: "Bank Statement (6 months)", required: true },
-                      { name: "Form 16 / ITR", required: false },
-                      { name: "Address Proof", required: false },
-                    ].map((doc) => (
-                      <div
-                        key={doc.name}
-                        className="p-4 border-2 border-dashed border-border rounded-lg hover:border-accent/50 transition-colors cursor-pointer"
+                    <div className="space-y-2">
+                      <Label htmlFor="loanTenure">Loan Tenure</Label>
+                      <Select
+                        value={formData.loanTenure}
+                        onValueChange={(value) => updateFormData("loanTenure", value)}
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
-                            <Upload className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">
-                              {doc.name}
-                              {doc.required && (
-                                <span className="text-destructive ml-1">*</span>
-                              )}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              PDF, JPG or PNG, max 5MB
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            Browse
-                          </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select tenure" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedLoanType === "home" ? (
+                            <>
+                              <SelectItem value="10">10 years</SelectItem>
+                              <SelectItem value="15">15 years</SelectItem>
+                              <SelectItem value="20">20 years</SelectItem>
+                              <SelectItem value="25">25 years</SelectItem>
+                              <SelectItem value="30">30 years</SelectItem>
+                            </>
+                          ) : selectedLoanType === "vehicle" ? (
+                            <>
+                              <SelectItem value="1">1 year</SelectItem>
+                              <SelectItem value="2">2 years</SelectItem>
+                              <SelectItem value="3">3 years</SelectItem>
+                              <SelectItem value="5">5 years</SelectItem>
+                              <SelectItem value="7">7 years</SelectItem>
+                            </>
+                          ) : (
+                            <>
+                              <SelectItem value="1">1 year</SelectItem>
+                              <SelectItem value="2">2 years</SelectItem>
+                              <SelectItem value="3">3 years</SelectItem>
+                              <SelectItem value="5">5 years</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="loanPurpose">Purpose of Loan</Label>
+                      <Input
+                        id="loanPurpose"
+                        placeholder="Describe the purpose"
+                        value={formData.loanPurpose}
+                        onChange={(e) => updateFormData("loanPurpose", e.target.value)}
+                      />
+                    </div>
+
+                    {/* Home Loan Specific */}
+                    {selectedLoanType === "home" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="propertyValue">Property Value (₹)</Label>
+                          <Input
+                            id="propertyValue"
+                            type="number"
+                            placeholder="Enter property value"
+                            value={formData.propertyValue}
+                            onChange={(e) => updateFormData("propertyValue", e.target.value)}
+                          />
                         </div>
-                      </div>
-                    ))}
+                        <div className="space-y-2">
+                          <Label htmlFor="downPayment">Down Payment (₹)</Label>
+                          <Input
+                            id="downPayment"
+                            type="number"
+                            placeholder="Enter down payment"
+                            value={formData.downPayment}
+                            onChange={(e) => updateFormData("downPayment", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="propertyLocation">Property Location</Label>
+                          <Input
+                            id="propertyLocation"
+                            placeholder="City, State"
+                            value={formData.propertyLocation}
+                            onChange={(e) => updateFormData("propertyLocation", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Interest Type</Label>
+                          <RadioGroup
+                            value={formData.interestType}
+                            onValueChange={(value) => updateFormData("interestType", value)}
+                            className="flex gap-6"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="fixed" id="fixed" />
+                              <Label htmlFor="fixed" className="cursor-pointer">
+                                Fixed Rate
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="floating" id="floating" />
+                              <Label htmlFor="floating" className="cursor-pointer">
+                                Floating Rate
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Vehicle Loan Specific */}
+                    {selectedLoanType === "vehicle" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="vehicleCost">Vehicle Cost (₹)</Label>
+                          <Input
+                            id="vehicleCost"
+                            type="number"
+                            placeholder="Enter vehicle cost"
+                            value={formData.vehicleCost}
+                            onChange={(e) => updateFormData("vehicleCost", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dealerName">Dealer Name</Label>
+                          <Input
+                            id="dealerName"
+                            placeholder="Enter dealer name"
+                            value={formData.dealerName}
+                            onChange={(e) => updateFormData("dealerName", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="downPaymentVehicle">Down Payment (₹)</Label>
+                          <Input
+                            id="downPaymentVehicle"
+                            type="number"
+                            placeholder="Enter down payment"
+                            value={formData.downPayment}
+                            onChange={(e) => updateFormData("downPayment", e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -715,85 +699,11 @@ export default function LoanApplication() {
 
             {/* Step 6: AI Preview */}
             {currentStep === 6 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-accent" />
-                    AI Eligibility Preview
-                  </CardTitle>
-                  <CardDescription>
-                    Based on your profile, here's our AI-powered assessment
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Left Column - Gauges */}
-                    <div className="space-y-6">
-                      <div className="text-center p-6 bg-muted/30 rounded-xl">
-                        <GaugeChart
-                          value={82}
-                          label="Approval Probability"
-                          size="lg"
-                          variant="risk"
-                        />
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Based on credit history and income
-                        </p>
-                      </div>
-                      <div className="text-center p-6 bg-muted/30 rounded-xl">
-                        <GaugeChart
-                          value={725}
-                          max={900}
-                          label="Estimated Credit Score"
-                          size="lg"
-                        />
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Good credit standing
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Right Column - Details */}
-                    <div className="space-y-4">
-                      <div className="p-4 bg-accent/10 border border-accent/20 rounded-lg">
-                        <p className="text-sm font-medium text-accent">
-                          Risk Category: Low Risk
-                        </p>
-                      </div>
-                      
-                      <div className="p-4 border border-border rounded-lg space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Suggested Loan Amount</span>
-                          <span className="font-semibold">₹42,00,000</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Estimated EMI</span>
-                          <span className="font-semibold">₹35,840/month</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Interest Rate</span>
-                          <span className="font-semibold">8.75% p.a.</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Processing Time</span>
-                          <span className="font-semibold">3-5 business days</span>
-                        </div>
-                      </div>
-
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <p className="text-sm font-medium mb-2">
-                          AI Recommendations
-                        </p>
-                        <ul className="text-sm text-muted-foreground space-y-1">
-                          <li>• Consider a 20-year tenure for lower EMI</li>
-                          <li>• Your DTI ratio is healthy at 28%</li>
-                          <li>• Adding a co-applicant could increase eligibility</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AIEligibilityPreview
+                loanType={selectedLoanType || "personal"}
+                monthlyIncome={formData.monthlyIncome || formData.annualTurnover}
+                loanAmount={formData.loanAmount}
+              />
             )}
 
             {/* Step 7: Review & Submit */}
@@ -806,44 +716,125 @@ export default function LoanApplication() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Personal Info Summary */}
+                  {/* Loan Summary */}
+                  <div className="p-4 bg-accent/5 border border-accent/20 rounded-lg">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-accent" />
+                      {selectedLoan?.name}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Loan Amount</span>
+                        <p className="font-medium">₹{parseInt(formData.loanAmount || "0").toLocaleString("en-IN")}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Tenure</span>
+                        <p className="font-medium">{formData.loanTenure} years</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Personal Info */}
                   <div className="p-4 bg-muted/30 rounded-lg">
                     <h4 className="font-medium mb-3">Personal Information</h4>
                     <div className="grid grid-cols-2 gap-y-2 text-sm">
-                      <span className="text-muted-foreground">Name:</span>
-                      <span>{formData.fullName || "John Doe"}</span>
-                      <span className="text-muted-foreground">PAN:</span>
-                      <span>{formData.pan || "ABCDE1234F"}</span>
-                      <span className="text-muted-foreground">Aadhaar:</span>
-                      <span>{formData.aadhaar || "XXXX XXXX 1234"}</span>
+                      <div>
+                        <span className="text-muted-foreground">Name:</span>
+                        <span className="ml-2 font-medium">{formData.fullName}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">PAN:</span>
+                        <span className="ml-2 font-medium">{formData.pan}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Aadhaar:</span>
+                        <span className="ml-2 font-medium">{formData.aadhaar}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">DOB:</span>
+                        <span className="ml-2 font-medium">{formData.dateOfBirth || "-"}</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Loan Details Summary */}
+                  {/* Employment Info */}
                   <div className="p-4 bg-muted/30 rounded-lg">
-                    <h4 className="font-medium mb-3">Loan Details</h4>
+                    <h4 className="font-medium mb-3">Employment Details</h4>
                     <div className="grid grid-cols-2 gap-y-2 text-sm">
-                      <span className="text-muted-foreground">Loan Type:</span>
-                      <span className="capitalize">{selectedLoanType || "Home"} Loan</span>
-                      <span className="text-muted-foreground">Amount:</span>
-                      <span>₹45,00,000</span>
-                      <span className="text-muted-foreground">Tenure:</span>
-                      <span>{formData.loanTenure || "20"} years</span>
+                      <div>
+                        <span className="text-muted-foreground">Type:</span>
+                        <span className="ml-2 font-medium capitalize">{employmentType}</span>
+                      </div>
+                      {employmentType === "salaried" ? (
+                        <>
+                          <div>
+                            <span className="text-muted-foreground">Company:</span>
+                            <span className="ml-2 font-medium">{formData.companyName}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Monthly Income:</span>
+                            <span className="ml-2 font-medium">
+                              ₹{parseInt(formData.monthlyIncome || "0").toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <span className="text-muted-foreground">Business:</span>
+                            <span className="ml-2 font-medium">{formData.businessName}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Annual Turnover:</span>
+                            <span className="ml-2 font-medium">
+                              ₹{parseInt(formData.annualTurnover || "0").toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Terms Acceptance */}
-                  <div className="space-y-4">
+                  {/* Documents */}
+                  <div className="p-4 bg-muted/30 rounded-lg">
+                    <h4 className="font-medium mb-3">Uploaded Documents</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {documents
+                        .filter((d) => d.status === "verified")
+                        .map((doc) => (
+                          <span
+                            key={doc.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-accent/10 text-accent text-sm rounded-full"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            {doc.name}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Consent */}
+                  <div className="space-y-4 pt-4 border-t border-border">
                     <div className="flex items-start space-x-3">
-                      <Checkbox id="terms" />
-                      <Label htmlFor="terms" className="text-sm leading-relaxed cursor-pointer">
-                        I confirm that all the information provided is accurate and I authorize Smart BankFlow to verify my details with relevant authorities.
+                      <Checkbox
+                        id="agreeTerms"
+                        checked={formData.agreeTerms}
+                        onCheckedChange={(checked) => updateFormData("agreeTerms", checked as boolean)}
+                      />
+                      <Label htmlFor="agreeTerms" className="text-sm font-normal cursor-pointer leading-tight">
+                        I confirm that all information provided is accurate and complete. I understand that
+                        providing false information may result in rejection of my application.
                       </Label>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <Checkbox id="consent" />
-                      <Label htmlFor="consent" className="text-sm leading-relaxed cursor-pointer">
-                        I agree to the Terms of Service and Privacy Policy, and consent to receive communications regarding my application.
+                      <Checkbox
+                        id="agreeCredit"
+                        checked={formData.agreeCredit}
+                        onCheckedChange={(checked) => updateFormData("agreeCredit", checked as boolean)}
+                      />
+                      <Label htmlFor="agreeCredit" className="text-sm font-normal cursor-pointer leading-tight">
+                        I authorize Smart BankFlow to access my credit report and verify my information with
+                        relevant agencies for the purpose of processing this loan application.
                       </Label>
                     </div>
                   </div>
@@ -861,23 +852,27 @@ export default function LoanApplication() {
             disabled={currentStep === 1}
             className="gap-2"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="w-4 h-4" />
             Previous
           </Button>
-          
+
           {currentStep < steps.length ? (
             <Button
               onClick={handleNext}
-              disabled={currentStep === 1 && !selectedLoanType}
-              className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+              disabled={!canProceed()}
+              className="gap-2 bg-accent hover:bg-accent/90"
             >
               Continue
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="w-4 h-4" />
             </Button>
           ) : (
-            <Button className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-              <CheckCircle2 className="h-4 w-4" />
+            <Button
+              onClick={handleSubmit}
+              disabled={!canProceed()}
+              className="gap-2 bg-accent hover:bg-accent/90"
+            >
               Submit Application
+              <CheckCircle2 className="w-4 h-4" />
             </Button>
           )}
         </div>
