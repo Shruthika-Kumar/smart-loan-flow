@@ -6,7 +6,13 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
-// Applicant Portal
+// Applicant Portal - Auth
+import Login from "./pages/applicant/Login";
+import Register from "./pages/applicant/Register";
+import VerifyOTP from "./pages/applicant/VerifyOTP";
+import CompleteKYC from "./pages/applicant/CompleteKYC";
+
+// Applicant Portal - Main
 import ApplicantDashboard from "./pages/applicant/ApplicantDashboard";
 import LoanApplication from "./pages/applicant/LoanApplication";
 import ApplicationTracking from "./pages/applicant/ApplicationTracking";
@@ -29,7 +35,13 @@ const App = () => (
           {/* Landing Page */}
           <Route path="/" element={<Index />} />
 
-          {/* Applicant Portal Routes */}
+          {/* Applicant Portal - Auth Routes */}
+          <Route path="/applicant/login" element={<Login />} />
+          <Route path="/applicant/register" element={<Register />} />
+          <Route path="/applicant/verify-otp" element={<VerifyOTP />} />
+          <Route path="/applicant/complete-kyc" element={<CompleteKYC />} />
+
+          {/* Applicant Portal - Main Routes */}
           <Route path="/applicant" element={<ApplicantDashboard />} />
           <Route path="/applicant/apply" element={<LoanApplication />} />
           <Route path="/applicant/track" element={<ApplicationTracking />} />
