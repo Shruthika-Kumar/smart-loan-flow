@@ -2,24 +2,31 @@ import { GaugeChart } from "@/components/ui/gauge-chart";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingUp, Shield, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { calculateEligibility } from "@/lib/calculations";
 
 interface AIEligibilityPreviewProps {
   loanType: string;
   monthlyIncome: string;
-  loanAmount?: string;
+  loanAmount: string; // Made required for real calculations
+  tenureYears?: number;
 }
 
-export function AIEligibilityPreview({ loanType, monthlyIncome, loanAmount }: AIEligibilityPreviewProps) {
-  // Simulate AI calculations based on inputs
+export function AIEligibilityPreview({ loanType, monthlyIncome, loanAmount, tenureYears = 5 }: AIEligibilityPreviewProps) {
+  // Use real calculation logic
   const income = parseInt(monthlyIncome) || 0;
-  const approvalProbability = income > 100000 ? 85 : income > 50000 ? 72 : income > 25000 ? 58 : 35;
-  const creditScore = 742; // Simulated
-  const dtiRatio = 28;
-  const riskCategory = approvalProbability > 75 ? "Low" : approvalProbability > 50 ? "Medium" : "High";
-
-  const suggestedLoanAmount = Math.round((income * 60) / 10000) * 10000;
-  const estimatedEMI = Math.round((suggestedLoanAmount * 0.0085));
+  const requestedPrincipal = parseInt(loanAmount) || 0;
   const interestRate = loanType === "home" ? 8.75 : loanType === "personal" ? 12.5 : 10.5;
+
+  const result = calculateEligibility({
+    monthlyIncome: income,
+    existingEMIs: 0, // Placeholder, can be expanded if we extract current EMIs
+    requestedAmount: requestedPrincipal,
+    tenureYears: tenureYears,
+    interestRate: interestRate
+  });
+
+  const { approvalProbability, dtiRatio, riskCategory, estimatedEMI, suggestedLoanAmount, recommendations } = result;
+  const creditScore = 742; // Still simulated as it needs a bureau integration
 
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`;
@@ -70,13 +77,12 @@ export function AIEligibilityPreview({ loanType, monthlyIncome, loanAmount }: AI
           <div className="space-y-4">
             {/* Risk Category */}
             <div
-              className={`p-4 rounded-lg border ${
-                riskCategory === "Low"
-                  ? "bg-risk-low/10 border-risk-low/30"
-                  : riskCategory === "Medium"
+              className={`p-4 rounded-lg border ${riskCategory === "Low"
+                ? "bg-risk-low/10 border-risk-low/30"
+                : riskCategory === "Medium"
                   ? "bg-risk-medium/10 border-risk-medium/30"
                   : "bg-risk-high/10 border-risk-high/30"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 {riskCategory === "Low" ? (
@@ -87,13 +93,12 @@ export function AIEligibilityPreview({ loanType, monthlyIncome, loanAmount }: AI
                   <AlertTriangle className="w-4 h-4 text-risk-high" />
                 )}
                 <span
-                  className={`text-sm font-medium ${
-                    riskCategory === "Low"
-                      ? "text-risk-low"
-                      : riskCategory === "Medium"
+                  className={`text-sm font-medium ${riskCategory === "Low"
+                    ? "text-risk-low"
+                    : riskCategory === "Medium"
                       ? "text-risk-medium"
                       : "text-risk-high"
-                  }`}
+                    }`}
                 >
                   Risk Category: {riskCategory} Risk
                 </span>
@@ -141,18 +146,12 @@ export function AIEligibilityPreview({ loanType, monthlyIncome, loanAmount }: AI
                 AI Recommendations
               </p>
               <ul className="text-sm text-muted-foreground space-y-1.5">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
-                  Consider a 20-year tenure for lower EMI burden
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
-                  Your DTI ratio is healthy at {dtiRatio}%
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
-                  Adding a co-applicant could increase eligibility by 25%
-                </li>
+                {recommendations.map((rec, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
+                    {rec}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>

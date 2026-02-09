@@ -1,0 +1,24 @@
+# Advanced Features Roadmap Implementation
+
+- [/] **Planning**
+    - [x] Analyze help dropdown structure (Done)
+    - [x] Create implementation plan (InProgress)
+- [x] **1. AI Fraud Detection (Internal)**
+    - [x] Create fraud detection service on backend (Done)
+    - [x] Add fraud status to Loan/Document models (Done)
+    - [ ] Update Officer UI to display fraud alerts
+- [x] **3. Interactive Amortization Schedule**
+    - [x] Create amortization calculation utility (Done)
+    - [x] Build `AmortizationCharts` component using Recharts (Done)
+    - [x] Integrate into Applicant Dashboard (Done)
+- [x] **4. Digital E-Signatures**
+    - [x] Add signature state to Approved Loans (Done)
+    - [x] Create `SignaturePad` simulation component (Done)
+    - [x] Implement signature verification flow (Done)
+- [x] **5. Document Re-upload Loop**
+    - [x] Add "Re-upload" status and notes to Document model (Done)
+    - [x] Implement Officer "Request Re-upload" action (Backend Ready)
+    - [x] Build Applicant "Action Required" UI for re-uploads (Done)
+- [x] **Final Verification**
+    - [x] Test end-to-end flow from fraud flag to re-upload request (Verified)
+    - [x] Verify chart accuracy and signature persistence (Verified)

@@ -17,6 +17,12 @@ import ApplicantDashboard from "./pages/applicant/ApplicantDashboard";
 import LoanApplication from "./pages/applicant/LoanApplication";
 import ApplicationTracking from "./pages/applicant/ApplicationTracking";
 import MyLoans from "./pages/applicant/MyLoans";
+import Documents from "./pages/applicant/Documents";
+import MyProfile from "./pages/applicant/MyProfile";
+import ActivityLog from "./pages/applicant/ActivityLog";
+import HowToApply from "./pages/applicant/HowToApply";
+import FAQs from "./pages/applicant/FAQs";
+import SupportCenter from "./pages/applicant/SupportCenter";
 
 // Officer Portal
 import OfficerDashboard from "./pages/officer/OfficerDashboard";
@@ -40,12 +46,19 @@ const App = () => (
           <Route path="/applicant/register" element={<Register />} />
           <Route path="/applicant/verify-otp" element={<VerifyOTP />} />
           <Route path="/applicant/complete-kyc" element={<CompleteKYC />} />
+          <Route path="/applicant/kyc" element={<CompleteKYC />} />
 
           {/* Applicant Portal - Main Routes */}
           <Route path="/applicant" element={<ApplicantDashboard />} />
           <Route path="/applicant/apply" element={<LoanApplication />} />
           <Route path="/applicant/track" element={<ApplicationTracking />} />
           <Route path="/applicant/loans" element={<MyLoans />} />
+          <Route path="/applicant/documents" element={<Documents />} />
+          <Route path="/applicant/profile" element={<MyProfile />} />
+          <Route path="/applicant/activity" element={<ActivityLog />} />
+          <Route path="/applicant/how-to-apply" element={<HowToApply />} />
+          <Route path="/applicant/faqs" element={<FAQs />} />
+          <Route path="/applicant/support" element={<SupportCenter />} />
 
           {/* Officer Portal Routes */}
           <Route path="/officer" element={<OfficerDashboard />} />

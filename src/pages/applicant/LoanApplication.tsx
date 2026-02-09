@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LoanTypeSelector, loanTypes } from "@/components/loan/LoanTypeSelector";
 import { SmartDocumentUpload, useSmartDocumentUpload, ExtractedData } from "@/components/loan/SmartDocumentUpload";
 import { AIEligibilityPreview } from "@/components/loan/AIEligibilityPreview";
+import api from "@/lib/api";
 
 const steps = [
   { id: 1, name: "Loan Type", icon: CreditCard },
@@ -94,7 +95,7 @@ export default function LoanApplication() {
       address: data.address || prev.address,
       companyName: data.companyName || prev.companyName,
       designation: data.designation || prev.designation,
-      monthlyIncome: data.monthlyIncome || prev.monthlyIncome,
+      monthlyIncome: data.monthlyIncome || (data.totalIncome ? (parseFloat(data.totalIncome) / 12).toFixed(0) : prev.monthlyIncome),
     }));
 
     toast({
@@ -125,12 +126,57 @@ export default function LoanApplication() {
     }
   };
 
-  const handleSubmit = () => {
-    toast({
-      title: "Application Submitted!",
-      description: "Your loan application has been submitted successfully. You will receive updates via SMS and email.",
-    });
-    navigate("/applicant/track");
+  const handleSubmit = async () => {
+    try {
+      // Get user from localStorage
+      const userData = localStorage.getItem("user");
+      if (!userData) {
+        toast({
+          title: "Error",
+          description: "Please login to submit a loan application.",
+          variant: "destructive",
+        });
+        navigate("/applicant/login");
+        return;
+      }
+
+      const user = JSON.parse(userData);
+
+      const loanData = {
+        userId: user.id || user._id,
+        fullName: formData.fullName,
+        amount: Number(formData.loanAmount),
+        tenure: Number(formData.loanTenure),
+        purpose: formData.loanPurpose,
+        monthlyIncome: Number(formData.monthlyIncome),
+        employmentType: employmentType,
+        annualTurnover: Number(formData.annualTurnover),
+      };
+
+      console.log("Submitting loan with data:", loanData);
+
+      const response = await api.post("/loans", loanData);
+
+      console.log("Loan submission successful:", response.data);
+
+      toast({
+        title: "Application Submitted!",
+        description: "Your loan application has been submitted successfully. You will receive updates via SMS and email.",
+      });
+      navigate("/applicant/track");
+    } catch (error: any) {
+      console.error("Submission error:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || "Failed to submit loan application. Please try again.";
+
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   };
 
   const updateFormData = (field: string, value: string | boolean) => {
@@ -186,22 +232,20 @@ export default function LoanApplication() {
             {steps.map((step) => (
               <div
                 key={step.id}
-                className={`flex flex-col items-center gap-2 ${
-                  step.id === currentStep
-                    ? "text-accent"
-                    : step.id < currentStep
+                className={`flex flex-col items-center gap-2 ${step.id === currentStep
+                  ? "text-accent"
+                  : step.id < currentStep
                     ? "text-accent/70"
                     : "text-muted-foreground"
-                }`}
+                  }`}
               >
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                    step.id === currentStep
-                      ? "bg-accent text-accent-foreground"
-                      : step.id < currentStep
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${step.id === currentStep
+                    ? "bg-accent text-accent-foreground"
+                    : step.id < currentStep
                       ? "bg-accent/20 text-accent"
                       : "bg-muted text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {step.id < currentStep ? (
                     <CheckCircle2 className="h-5 w-5" />
@@ -697,12 +741,13 @@ export default function LoanApplication() {
               </Card>
             )}
 
-            {/* Step 6: AI Preview */}
+            {/* Step 6: AI Eligibility Preview */}
             {currentStep === 6 && (
               <AIEligibilityPreview
                 loanType={selectedLoanType || "personal"}
-                monthlyIncome={formData.monthlyIncome || formData.annualTurnover}
+                monthlyIncome={formData.monthlyIncome}
                 loanAmount={formData.loanAmount}
+                tenureYears={parseInt(formData.loanTenure) || 5}
               />
             )}
 

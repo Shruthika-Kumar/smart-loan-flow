@@ -8,9 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/api";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -47,17 +50,68 @@ export default function Register() {
     { label: "One special character", met: /[^A-Za-z0-9]/.test(formData.password) },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (currentStep === 1) {
       setCurrentStep(2);
       return;
     }
+
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      console.log('Attempting registration with:', {
+        username: formData.fullName,
+        email: formData.email,
+        role: "applicant"
+      });
+
+      const response = await api.post("/auth/register", {
+        username: formData.fullName,
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        role: "applicant",
+      });
+
+      console.log('Registration successful:', response.data);
+
+      // Store token and user data
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+
+      toast({
+        title: "Account Created!",
+        description: "Your account has been created successfully. Redirecting to dashboard...",
+      });
+
+      // Redirect to dashboard (the route exists)
+      setTimeout(() => {
+        navigate("/applicant");
+      }, 1000);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+
+      toast({
+        title: "Registration Failed",
+        description: error.response?.data?.message || error.response?.data?.error || "Failed to create account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-      navigate("/applicant/verify-otp");
-    }, 1500);
+    }
   };
 
   const progress = currentStep === 1 ? 50 : 100;
@@ -226,13 +280,12 @@ export default function Register() {
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
-                      <Progress 
-                        value={passwordStrength()} 
-                        className={`h-1.5 ${
-                          passwordStrength() <= 25 ? "[&>div]:bg-risk-high" :
+                      <Progress
+                        value={passwordStrength()}
+                        className={`h-1.5 ${passwordStrength() <= 25 ? "[&>div]:bg-risk-high" :
                           passwordStrength() <= 50 ? "[&>div]:bg-risk-medium" :
-                          "[&>div]:bg-risk-low"
-                        }`}
+                            "[&>div]:bg-risk-low"
+                          }`}
                       />
                       <div className="grid grid-cols-2 gap-2 mt-3">
                         {passwordRequirements.map((req) => (
