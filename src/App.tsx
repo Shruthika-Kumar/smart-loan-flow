@@ -28,6 +28,11 @@ import SupportCenter from "./pages/applicant/SupportCenter";
 import OfficerDashboard from "./pages/officer/OfficerDashboard";
 import ApplicationList from "./pages/officer/ApplicationList";
 import ApplicationDetail from "./pages/officer/ApplicationDetail";
+import RiskAssessment from "./pages/officer/RiskAssessment";
+import FraudMonitoring from "./pages/officer/FraudMonitoring";
+import WorkflowEngine from "./pages/officer/WorkflowEngine";
+import Reports from "./pages/officer/Reports";
+import AdminSettings from "./pages/officer/AdminSettings";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +69,11 @@ const App = () => (
           <Route path="/officer" element={<OfficerDashboard />} />
           <Route path="/officer/applications" element={<ApplicationList />} />
           <Route path="/officer/applications/:id" element={<ApplicationDetail />} />
+          <Route path="/officer/risk" element={<RiskAssessment />} />
+          <Route path="/officer/fraud" element={<FraudMonitoring />} />
+          <Route path="/officer/workflow" element={<WorkflowEngine />} />
+          <Route path="/officer/reports" element={<Reports />} />
+          <Route path="/officer/settings" element={<AdminSettings />} />
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
