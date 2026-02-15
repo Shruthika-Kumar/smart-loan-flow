@@ -25,6 +25,7 @@ import FAQs from "./pages/applicant/FAQs";
 import SupportCenter from "./pages/applicant/SupportCenter";
 
 // Officer Portal
+import OfficerLogin from "./pages/officer/OfficerLogin";
 import OfficerDashboard from "./pages/officer/OfficerDashboard";
 import ApplicationList from "./pages/officer/ApplicationList";
 import ApplicationDetail from "./pages/officer/ApplicationDetail";
@@ -66,6 +67,7 @@ const App = () => (
           <Route path="/applicant/support" element={<SupportCenter />} />
 
           {/* Officer Portal Routes */}
+          <Route path="/officer/login" element={<OfficerLogin />} />
           <Route path="/officer" element={<OfficerDashboard />} />
           <Route path="/officer/applications" element={<ApplicationList />} />
           <Route path="/officer/applications/:id" element={<ApplicationDetail />} />

@@ -16,6 +16,8 @@ import {
   User,
   ChevronDown,
   Workflow,
+  Shield,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { useOfficerAuth } from "@/hooks/useOfficerAuth";
 
 interface OfficerLayoutProps {
   children: ReactNode;
@@ -46,9 +49,17 @@ const adminNavigation = [
   { name: "Settings", href: "/officer/settings", icon: Settings },
 ];
 
+const roleLabels: Record<string, string> = {
+  officer: "Loan Officer",
+  risk_analyst: "Risk Analyst",
+  credit_manager: "Credit Manager",
+  admin: "Administrator",
+};
+
 export function OfficerLayout({ children }: OfficerLayoutProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { user, isLoading, logout, isAdmin } = useOfficerAuth();
 
   const isActive = (href: string) => {
     if (href === "/officer") {
@@ -56,6 +67,25 @@ export function OfficerLayout({ children }: OfficerLayoutProps) {
     }
     return location.pathname.startsWith(href);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center">
+            <span className="text-lg font-bold text-white">SB</span>
+          </div>
+          <div className="w-8 h-8 border-3 border-accent/30 border-t-accent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Verifying credentials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  const displayName = user.username || user.email?.split("@")[0] || "Officer";
+  const roleLabel = roleLabels[user.role] || "Officer";
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -91,6 +121,24 @@ export function OfficerLayout({ children }: OfficerLayoutProps) {
           )}
         </div>
 
+        {/* User Info (collapsed: avatar only) */}
+        {!collapsed && (
+          <div className="px-4 py-3 border-b border-sidebar-border">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center flex-shrink-0">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-sidebar-foreground truncate">{displayName}</p>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-risk-low" />
+                  <p className="text-[10px] text-sidebar-foreground/50">{roleLabel}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           <div className="space-y-1">
@@ -115,6 +163,7 @@ export function OfficerLayout({ children }: OfficerLayoutProps) {
             ))}
           </div>
 
+          {/* Admin section - visible to all but settings restricted */}
           <div className="pt-6 space-y-1">
             {!collapsed && (
               <p className="px-3 text-xs font-medium text-sidebar-foreground/50 uppercase tracking-wider mb-2">
@@ -173,6 +222,12 @@ export function OfficerLayout({ children }: OfficerLayoutProps) {
 
           {/* Right Actions */}
           <div className="flex items-center gap-3">
+            {/* Session indicator */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-risk-low/10 text-risk-low text-xs font-medium">
+              <div className="w-1.5 h-1.5 rounded-full bg-risk-low pulse-live" />
+              Secure Session
+            </div>
+
             {/* Notifications */}
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5 text-muted-foreground" />
@@ -185,27 +240,36 @@ export function OfficerLayout({ children }: OfficerLayoutProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 px-2">
-                  <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center">
-                    <User className="h-4 w-4 text-accent-foreground" />
+                  <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
+                    <User className="h-4 w-4 text-white" />
                   </div>
                   <div className="text-left hidden sm:block">
-                    <p className="text-sm font-medium">Sarah Johnson</p>
-                    <p className="text-xs text-muted-foreground">Loan Officer</p>
+                    <p className="text-sm font-medium">{displayName}</p>
+                    <p className="text-xs text-muted-foreground">{roleLabel}</p>
                   </div>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <User className="mr-2 h-4 w-4" />
                   My Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  <Shield className="mr-2 h-4 w-4" />
+                  Security Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Activity className="mr-2 h-4 w-4" />
+                  Activity Log
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem className="text-destructive" onClick={logout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign Out
                 </DropdownMenuItem>
