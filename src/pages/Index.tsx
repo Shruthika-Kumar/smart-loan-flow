@@ -87,7 +87,7 @@ export default function LandingPage() {
                   </Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild className="h-12">
-                  <Link to="/officer">Officer Portal</Link>
+                  <Link to="/officer/login">Officer Portal</Link>
                 </Button>
               </div>
 
